@@ -798,6 +798,32 @@ module Pod
         end.message.should.match /You should run `pod update Expecta`/
       end
 
+      it 'raises if dependencies need to be fetched but fetching is not allowed' do
+        sandbox = config.sandbox
+        podfile = Podfile.new do
+          platform :ios, '8.0'
+          project 'SampleProject/SampleProject'
+          target 'SampleProject' do
+            pod 'LocalPod', :path => '../'
+          end
+        end
+
+        hash = {}
+        hash['PODS'] = ['Expecta (0.2.0)', { 'LocalPod (1.0)' => ['Expecta (=0.2.0)'] }]
+        hash['DEPENDENCIES'] = ['LocalPod (from `../`)']
+        hash['EXTERNAL SOURCES'] = { 'LocalPod' => { :path => '../' } }
+        hash['SPEC CHECKSUMS'] = {}
+        hash['COCOAPODS'] = VERSION
+        lockfile = Lockfile.new(hash)
+
+        analyzer = Installer::Analyzer.new(sandbox, podfile, lockfile)
+        error = should.raise(Informative) do
+          analyzer.analyze(false)
+        end
+        error.message.should.include \
+          "Cannot analyze without fetching dependencies since the sandbox is not up-to-date. Run `pod install` to ensure all dependencies have been fetched."
+      end
+
       #--------------------------------------#
 
       it 'takes into account locked implicit dependencies' do
